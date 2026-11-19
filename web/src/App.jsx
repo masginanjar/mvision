@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { supabase, googleAktif } from './supabase.js'
+import { supabase, caraMasuk } from './supabase.js'
 import { STATUS, PERAN, kosong, periksa, tgl } from './domain.js'
 
 const warna = { ok: 'bg-brand-soft text-brand-dark', warn: 'bg-amber-100 text-amber-800', bad: 'bg-red-100 text-red-700', info: 'bg-sky-100 text-sky-800', mute: 'bg-zinc-100 text-zinc-600' }
@@ -15,7 +15,7 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSesi(data.session))
     const { data: l } = supabase.auth.onAuthStateChange((_e, s) => setSesi(s))
-    googleAktif().then(setGoogle)
+    caraMasuk().then(setGoogle)
     const on = () => setDaring(true), off = () => setDaring(false); addEventListener('online', on); addEventListener('offline', off)
     return () => { l.subscription.unsubscribe(); removeEventListener('online', on); removeEventListener('offline', off) }
   }, [])
@@ -61,19 +61,39 @@ export default function App() {
 }
 const Layar = ({ pita, children }) => <div className="flex min-h-dvh flex-col">{pita}<div className="flex flex-1 items-center justify-center p-4"><div className="w-full max-w-sm">{children}</div></div></div>
 
-function Masuk({ google }) {
-  const [sibuk, setSibuk] = useState(false), [pesan, setPesan] = useState('')
-  async function masuk() {
-    setSibuk(true); setPesan('')
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + import.meta.env.BASE_URL } })
-    if (error) { setPesan('Belum berhasil masuk. Coba lagi.'); setSibuk(false) }
+function Masuk({ google: cara }) {
+  const [sibuk, setSibuk] = useState(''), [pesan, setPesan] = useState(''), [email, setEmail] = useState(''), [terkirim, setTerkirim] = useState('')
+  const balik = location.origin + import.meta.env.BASE_URL
+  const galat = e => /rate|limit|seconds/i.test(e.message || '') ? 'Terlalu sering mencoba. Tunggu sebentar lalu coba lagi.' : /not authorized|not allowed/i.test(e.message || '') ? 'Email ini belum diizinkan menerima link dari server uji.' : 'Belum berhasil. Coba lagi.'
+  async function google() {
+    setSibuk('g'); setPesan('')
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: balik } })
+    if (error) { setPesan(galat(error)); setSibuk('') }
+  }
+  async function lewatEmail(e) {
+    e.preventDefault(); if (sibuk) return; setPesan('')
+    const em = email.trim().toLowerCase()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { setPesan('Tulis alamat email yang benar.'); return }
+    setSibuk('e'); const { error } = await supabase.auth.signInWithOtp({ email: em, options: { emailRedirectTo: balik } }); setSibuk('')
+    if (error) setPesan(galat(error)); else setTerkirim(em)
+  }
+  async function tamu() {
+    setSibuk('t'); setPesan(''); const { error } = await supabase.auth.signInAnonymously(); setSibuk('')
+    if (error) setPesan(/disabled/i.test(error.message || '') ? 'Mode tamu belum dinyalakan di server.' : galat(error))
   }
   return <Kartu className="p-6">
     <div className="mb-5 flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-lg font-bold text-white">M</span><div><div className="text-xl font-bold">MVISION</div><div className="text-sm text-muted">Sekolah Mutiara</div></div></div>
-    <Tombol className="w-full" onClick={masuk} disabled={sibuk || google === false}>{sibuk ? 'Membuka Google…' : 'Masuk dengan Google'}</Tombol>
-    {google === false && <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Login Google belum diaktifkan. Admin perlu menyelesaikan pengaturan Google lebih dulu.</p>}
+    <Tombol className="w-full" onClick={google} disabled={!!sibuk || (cara && !cara.google)}>{sibuk === 'g' ? 'Membuka Google…' : 'Masuk dengan Google'}</Tombol>
+    {cara && !cara.google && <p role="status" className="mt-2 text-[13px] text-muted">Login Google belum diaktifkan. Untuk uji, pakai email atau mode tamu di bawah.</p>}
+    <div className="my-4 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />atau<span className="h-px flex-1 bg-line" /></div>
+    {terkirim ? <p role="status" className="rounded-xl bg-brand-soft p-3 text-sm text-brand-dark">Link masuk dikirim ke <b>{terkirim}</b>. Buka email itu di perangkat ini, lalu tekan link di dalamnya. <button type="button" className="font-semibold underline" onClick={() => setTerkirim('')}>Ganti email</button></p>
+      : <form onSubmit={lewatEmail} noValidate className="flex flex-col gap-2"><label htmlFor="m-email" className="text-sm font-semibold">Masuk dengan email</label>
+        <input id="m-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" enterKeyHint="send" value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@email.com" className={kelas(false)} disabled={cara && !cara.email} />
+        <Tombol utama type="submit" disabled={!!sibuk || (cara && !cara.email)}>{sibuk === 'e' ? 'Mengirim…' : 'Kirim link masuk'}</Tombol></form>}
+    <Tombol className="mt-3 w-full" onClick={tamu} disabled={!!sibuk || (cara && !cara.tamu)}>{sibuk === 't' ? 'Membuka…' : 'Coba sebagai tamu'}</Tombol>
+    {cara && !cara.tamu && <p role="status" className="mt-2 text-[13px] text-muted">Mode tamu belum dinyalakan di server.</p>}
     {pesan && <p role="alert" className="mt-3 text-sm text-red-700">{pesan}</p>}
-    <p className="mt-4 text-[13px] text-muted">Satu akun Google untuk semua peran. Peran Anda terbaca otomatis setelah masuk.</p>
+    <p className="mt-4 text-[13px] text-muted">Email dan mode tamu hanya untuk uji internal. Tamu tidak punya identitas dan datanya dapat dihapus kapan saja.</p>
   </Kartu>
 }
 
@@ -158,7 +178,7 @@ function Panitia({ data, saya, muat }) {
 }
 
 function Akun({ data, sesi }) {
-  return <div className="flex flex-col gap-3"><Kartu><div className="text-[17px] font-semibold">{data.profil?.nama || 'Tanpa nama'}</div><div className="text-sm text-muted">{sesi.user.email}</div>
+  return <div className="flex flex-col gap-3"><Kartu><div className="text-[17px] font-semibold">{data.profil?.nama || (sesi.user.is_anonymous ? 'Tamu' : 'Tanpa nama')}</div><div className="text-sm text-muted">{sesi.user.is_anonymous ? 'Tamu (uji) · tanpa identitas' : sesi.user.email}</div>
     <div className="mt-3 flex flex-wrap gap-2">{data.peran.map(p => <span key={p.peran} className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold">{PERAN[p.peran]}{p.bagian?.length ? ' · ' + p.bagian.join(', ') : ''}</span>)}</div></Kartu>
     <Tombol bahaya onClick={() => supabase.auth.signOut()}>Keluar</Tombol>
     <p className="text-[13px] text-muted">Tahap 1: login, pendaftaran, dan hak akses di server. Pembayaran, berkas, kehadiran, dan penjemputan masih di versi demo.</p></div>
