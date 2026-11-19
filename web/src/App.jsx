@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, caraMasuk } from './supabase.js'
 import { STATUS, PERAN, kosong, periksa, tgl } from './domain.js'
+import { Kehadiran, Kiosk, bolehScan, hariIni } from './Hadir.jsx'
+import { Lembar } from './ui.jsx'
 
 const warna = { ok: 'bg-brand-soft text-brand-dark', warn: 'bg-amber-100 text-amber-800', bad: 'bg-red-100 text-red-700', info: 'bg-sky-100 text-sky-800', mute: 'bg-zinc-100 text-zinc-600' }
 const Pil = ({ s }) => { const v = STATUS[s] || [s, 'mute']; return <span className={'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ' + warna[v[1]]}>{v[0]}</span> }
 const Tombol = ({ utama, bahaya, className = '', ...p }) => <button {...p} className={'min-h-12 rounded-xl px-4 text-[15px] font-semibold transition active:scale-[.98] disabled:opacity-50 ' + (utama ? 'bg-brand text-white ' : bahaya ? 'border border-red-200 bg-white text-red-700 ' : 'border border-line bg-white ') + className} />
 const Kartu = ({ className = '', ...p }) => <div {...p} className={'rounded-2xl border border-line bg-white p-4 ' + className} />
 const Ikon = ({ d }) => <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
-const IK = { rumah: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', tambah: 'M12 5v14M5 12h14', daftar: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01', akun: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5', kembali: 'M15 5l-7 7 7 7' }
+const IK = { rumah: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', tambah: 'M12 5v14M5 12h14', daftar: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01', akun: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5', hadir: 'M5 12l4 4 10-10M4 4h16v16H4z', kiosk: 'M4 8h3l2-2h6l2 2h3v11H4zM12 17a3.5 3.5 0 100-7 3.5 3.5 0 000 7z', kembali: 'M15 5l-7 7 7 7' }
 
 export default function App() {
   const [sesi, setSesi] = useState(undefined), [google, setGoogle] = useState(undefined)
@@ -25,19 +27,26 @@ export default function App() {
       supabase.from('profil').select('*').eq('id', sesi.user.id).maybeSingle(), supabase.from('peran_pengguna').select('*').eq('user_id', sesi.user.id),
       supabase.from('tingkat').select('*').order('urut'), supabase.from('gelombang').select('*').eq('aktif', true).order('buka'),
       supabase.from('pendaftaran').select('*').order('dibuat_at', { ascending: false }), supabase.from('transisi_status').select('*')])
-    const err = [pr, pe, ti, ge, da, tr].find(x => x.error)
+    const sejak = new Date(Date.now() - 8 * 864e5).toISOString().slice(0, 10)
+    const [pt, sw, qr, ab, kl, gd, nt] = await Promise.all([supabase.from('petugas_hadir').select('*'), supabase.from('siswa').select('*').eq('aktif', true).order('kelas').order('nama'), supabase.from('siswa_qr').select('*'),
+      supabase.from('absensi').select('*').gte('tgl', sejak), supabase.from('kelas').select('*').order('nama'), supabase.from('gedung').select('*').order('id'), supabase.from('notifikasi').select('*').order('at', { ascending: false }).limit(5)])
+    const err = [pr, pe, ti, ge, da, tr, pt, sw, qr, ab, kl, gd, nt].find(x => x.error)
     if (err) { setGalat('Data belum bisa dimuat. Periksa koneksi lalu coba lagi.'); return }
-    setData({ profil: pr.data, peran: pe.data, tingkat: ti.data, gelombang: ge.data, daftar: da.data, transisi: tr.data })
+    const superadmin = pe.data.some(p => p.peran === 'superadmin'); let profilSemua = []
+    if (superadmin) { const x = await supabase.from('profil').select('id,nama,email'); profilSemua = x.data || [] }
+    setData({ profil: pr.data, peran: pe.data, tingkat: ti.data, gelombang: ge.data, daftar: da.data, transisi: tr.data, superadmin, profilSemua,
+      petugas: pt.data.filter(p => p.user_id === sesi.user.id), petugasSemua: superadmin ? pt.data : [], siswa: sw.data, qr: qr.data, absensi: ab.data, kelas: kl.data, gedung: gd.data, notif: nt.data })
   }
   useEffect(() => { if (sesi) muat(); else setData(null) }, [sesi && sesi.user.id])
 
-  const pita = <div role="note" className="flex-none border-b border-amber-200 bg-amber-50 px-3 pb-1 pt-[calc(4px+env(safe-area-inset-top))] text-center text-xs font-semibold text-amber-800">TAHAP 1 · uji internal · jangan masukkan data asli dulu</div>
+  const pita = <div role="note" className="flex-none border-b border-amber-200 bg-amber-50 px-3 pb-1 pt-[calc(4px+env(safe-area-inset-top))] text-center text-xs font-semibold text-amber-800">UJI INTERNAL · jangan masukkan data asli dulu</div>
   if (sesi === undefined) return <Layar pita={pita}><p className="text-center text-muted">Memuat…</p></Layar>
   if (!sesi) return <Layar pita={pita}><Masuk google={google} /></Layar>
 
   const staf = data && data.peran.some(p => p.peran === 'panitia' || p.peran === 'superadmin')
-  const menu = [['beranda', 'Beranda', IK.rumah], ['daftar', 'Daftar', IK.tambah]].concat(staf ? [['panitia', 'Pendaftar', IK.daftar]] : []).concat([['akun', 'Akun', IK.akun]])
-  const judul = { beranda: 'Anak Saya', daftar: 'Daftarkan Anak', panitia: 'Semua Pendaftar', akun: 'Akun' }[hal]
+  const scan = data && bolehScan(data)
+  const menu = [['beranda', 'Beranda', IK.rumah], ['hadir', 'Kehadiran', IK.hadir]].concat(scan ? [['kiosk', 'Kiosk', IK.kiosk]] : []).concat(staf ? [['panitia', 'Pendaftar', IK.daftar]] : []).concat([['akun', 'Akun', IK.akun]])
+  const judul = { beranda: 'Beranda', daftar: 'Daftarkan Anak', hadir: 'Kehadiran', kiosk: 'Kiosk Kedatangan', panitia: 'Semua Pendaftar', akun: 'Akun' }[hal]
   return <div className="mx-auto flex h-dvh max-w-3xl flex-col">
     {pita}
     <header className="flex min-h-13 flex-none items-center gap-2 border-b border-line bg-white px-3">
@@ -50,6 +59,8 @@ export default function App() {
       {!data && !galat && <p className="text-center text-muted">Memuat data…</p>}
       {data && hal === 'beranda' && <Beranda data={data} ke={setHal} />}
       {data && hal === 'daftar' && <Formulir data={data} daring={daring} selesai={() => { muat(); setHal('beranda') }} />}
+      {data && hal === 'hadir' && <Kehadiran data={data} saya={sesi.user.id} muat={muat} />}
+      {data && hal === 'kiosk' && scan && <Kiosk daring={daring} muat={muat} />}
       {data && hal === 'panitia' && staf && <Panitia data={data} saya={sesi.user.id} muat={muat} />}
       {data && hal === 'akun' && <Akun data={data} sesi={sesi} />}
     </main>
@@ -104,6 +115,7 @@ function Beranda({ data, ke }) {
       <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white text-brand"><Ikon d={IK.tambah} /></span>
       <span><span className="block text-xl font-bold">{d.length ? 'Tambahkan Anak Lain' : 'Daftarkan Anak Saya'}</span><span className="text-sm opacity-90">{data.gelombang[0] ? data.gelombang[0].nama + ' dibuka sampai ' + tgl(data.gelombang[0].tutup) : 'Pendaftaran sedang tidak dibuka'}</span></span>
     </button>
+    {data.notif.length > 0 && <Kartu><h2 className="mb-1 text-[15px] font-bold">Kabar terbaru</h2>{data.notif.map(n => <p key={n.id} className="border-t border-line py-2 text-sm first:border-0">{n.teks}</p>)}</Kartu>}
     {!d.length && <Kartu><p className="text-muted">Belum ada anak yang didaftarkan. Tekan tombol hijau di atas untuk mulai.</p></Kartu>}
     {d.map(x => <Kartu key={x.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[17px] font-semibold">{x.anak_nama}</div><div className="text-sm text-muted">{nm(x.tingkat)} · No. {x.no}</div></div><Pil s={x.status} /></div>
       <p className="mt-2 text-[13px] text-muted">Dikirim {tgl(x.dibuat_at)}. Pembayaran dan unggah berkas menyusul di tahap berikutnya.</p></Kartu>)}
@@ -156,19 +168,19 @@ function Formulir({ data, daring, selesai }) {
 }
 
 function Panitia({ data, saya, muat }) {
-  const [sibuk, setSibuk] = useState(''), [pesan, setPesan] = useState('')
+  const [sibuk, setSibuk] = useState(''), [pesan, setPesan] = useState(''), [tanya, setTanya] = useState(null)
   const bagian = data.peran.some(p => p.peran === 'superadmin') ? null : (data.peran.find(p => p.peran === 'panitia') || { bagian: [] }).bagian
   const nm = id => (data.tingkat.find(t => t.id === id) || {}).nama || id
-  async function ubah(x, ke) {
-    let cat = null
-    if (['dibatalkan', 'tidak_diterima', 'berkas_perlu_perbaikan'].includes(ke)) { cat = prompt('Alasan (wajib):'); if (!cat) return }
-    setSibuk(x.id); setPesan('')
+  async function ubah(x, ke, cat = null) {
+    if (['dibatalkan', 'tidak_diterima', 'berkas_perlu_perbaikan'].includes(ke) && cat === null) { setTanya({ x, ke, alasan: '' }); return }
+    setTanya(null); setSibuk(x.id); setPesan('')
     const { error } = await supabase.rpc('ubah_status', { p_id: x.id, p_ke: ke, p_catatan: cat })
     setSibuk(''); if (error) setPesan(error.message); else muat()
   }
   return <div className="flex flex-col gap-3">
     {pesan && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{pesan}</p>}
     {!data.daftar.length && <Kartu><p className="text-muted">Belum ada pendaftar.</p></Kartu>}
+    {tanya && <Lembar judul={(STATUS[tanya.ke] || [tanya.ke])[0] + '?'} tutup={() => setTanya(null)}><label htmlFor="t-al" className="text-sm font-semibold">Alasan <span className="text-red-600">*</span></label><textarea id="t-al" rows="2" className="mt-1.5 min-h-12 w-full rounded-xl border border-line px-3 py-2" value={tanya.alasan} onChange={e => setTanya({ ...tanya, alasan: e.target.value })} /><div className="mt-4 flex flex-col gap-2"><Tombol bahaya disabled={!tanya.alasan.trim()} onClick={() => ubah(tanya.x, tanya.ke, tanya.alasan.trim())}>Simpan</Tombol><Tombol onClick={() => setTanya(null)}>Batal</Tombol></div></Lembar>}
     {data.daftar.map(x => { const aksi = data.transisi.filter(t => t.dari === x.status && t.bagian !== 'pemilik' && (!bagian || bagian.includes(t.bagian)) && x.pemilik !== saya)
       return <Kartu key={x.id}><div className="flex items-start justify-between gap-3"><div><div className="font-semibold">{x.anak_nama}</div><div className="text-sm text-muted">{nm(x.tingkat)} · {x.no} · {x.wali_nama} ({x.wali_hubungan})</div></div><Pil s={x.status} /></div>
         {x.pemilik === saya && <p className="mt-2 text-[13px] text-muted">Ini anak Anda sendiri. Panitia lain yang memprosesnya.</p>}
@@ -179,7 +191,8 @@ function Panitia({ data, saya, muat }) {
 
 function Akun({ data, sesi }) {
   return <div className="flex flex-col gap-3"><Kartu><div className="text-[17px] font-semibold">{data.profil?.nama || (sesi.user.is_anonymous ? 'Tamu' : 'Tanpa nama')}</div><div className="text-sm text-muted">{sesi.user.is_anonymous ? 'Tamu (uji) · tanpa identitas' : sesi.user.email}</div>
+    <div className="mt-2 text-sm">Kode akun: <b className="tracking-widest">{sesi.user.id.slice(0, 8).toUpperCase()}</b></div>
     <div className="mt-3 flex flex-wrap gap-2">{data.peran.map(p => <span key={p.peran} className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold">{PERAN[p.peran]}{p.bagian?.length ? ' · ' + p.bagian.join(', ') : ''}</span>)}</div></Kartu>
     <Tombol bahaya onClick={() => supabase.auth.signOut()}>Keluar</Tombol>
-    <p className="text-[13px] text-muted">Tahap 1: login, pendaftaran, dan hak akses di server. Pembayaran, berkas, kehadiran, dan penjemputan masih di versi demo.</p></div>
+    <p className="text-[13px] text-muted">Sudah di server: login, pendaftaran, dan absensi kedatangan dengan QR. Pembayaran, berkas, penjemputan, dan pengenalan wajah masih di versi demo.</p></div>
 }
