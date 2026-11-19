@@ -100,7 +100,7 @@ function Formulir({ data, daring, selesai }) {
   const [f, setF] = useState(() => { try { return { ...kosong(), ...JSON.parse(sessionStorage.getItem(KUNCI) || '{}') } } catch { return kosong() } })
   const [g, setG] = useState({}), [sibuk, setSibuk] = useState(false), [pesan, setPesan] = useState(''), [jadi, setJadi] = useState(null)
   const token = useRef(crypto.randomUUID())
-  const ubah = (k, v) => { const n = { ...f, [k]: v }; setF(n); if (g[k]) setG({ ...g, [k]: undefined }); const { nik, ...aman } = n; try { sessionStorage.setItem(KUNCI, JSON.stringify(aman)) } catch { } }
+  const ubah = (k, v) => { const n = { ...f, [k]: v }; setF(n); if (g[k]) setG({ ...g, [k]: undefined }); if (pesan) setPesan(''); const { nik, ...aman } = n; try { sessionStorage.setItem(KUNCI, JSON.stringify(aman)) } catch { } }
   async function kirim(e) {
     e.preventDefault(); if (sibuk) return
     const er = periksa(f); setG(er); setPesan('')
@@ -128,7 +128,7 @@ function Formulir({ data, daring, selesai }) {
     <Kartu className="flex flex-col gap-4"><h2 className="text-base font-bold">Orang tua atau wali</h2><p className="-mt-2 text-[13px] text-muted">Cukup satu orang.</p>
       {P('wali_hubungan', 'Hubungan dengan anak', [['Ayah', 'Ayah'], ['Ibu', 'Ibu'], ['Wali', 'Wali']])}
       {T('wali_nama', 'Nama lengkap', { auto: 'name' })}{T('wali_hp', 'Nomor HP', { type: 'tel', inputMode: 'tel', auto: 'tel' })}{T('alamat', 'Alamat tinggal', { auto: 'street-address' })}</Kartu>
-    <div className="sticky bottom-0 -mx-4 border-t border-line bg-white px-4 py-3">
+    <div className="sticky -bottom-6 -mx-4 -mb-6 border-t border-line bg-white px-4 py-3">
       {pesan && <p role="alert" className="mb-2 text-sm text-red-700">{pesan}</p>}
       <Tombol utama type="submit" className="w-full" disabled={sibuk}>{sibuk ? 'Mengirim…' : 'Kirim pendaftaran'}</Tombol>
     </div>
