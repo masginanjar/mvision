@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@theme { --color-brand:#087F50; --color-brand-dark:#066B43; --color-brand-soft:#E8F3EE; --color-ink:#18181B; --color-muted:#6B7280; --color-line:#E7E9EE; --color-page:#F7F8FA; }
+html,body,#root{height:100%}
+body{margin:0;background:var(--color-page);color:var(--color-ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+input,select,textarea{font-size:16px}
+button{touch-action:manipulation}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
