@@ -3,6 +3,7 @@ import { supabase, caraMasuk } from './supabase.js'
 import { STATUS, PERAN, kosong, periksa, tgl } from './domain.js'
 import { Kehadiran, Kiosk, bolehScan, hariIni } from './Hadir.jsx'
 import { Lembar } from './ui.jsx'
+import { DataPanitia } from './Spmb.jsx'
 
 const warna = { ok: 'bg-brand-soft text-brand-dark', warn: 'bg-amber-100 text-amber-800', bad: 'bg-red-100 text-red-700', info: 'bg-sky-100 text-sky-800', mute: 'bg-zinc-100 text-zinc-600' }
 const Pil = ({ s }) => { const v = STATUS[s] || [s, 'mute']; return <span className={'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ' + warna[v[1]]}>{v[0]}</span> }
@@ -39,14 +40,14 @@ export default function App() {
   }
   useEffect(() => { if (sesi) muat(); else setData(null) }, [sesi && sesi.user.id])
 
-  const pita = <div role="note" className="flex-none border-b border-amber-200 bg-amber-50 px-3 pb-1 pt-[calc(4px+env(safe-area-inset-top))] text-center text-xs font-semibold text-amber-800">UJI INTERNAL · jangan masukkan data asli dulu</div>
+  const pita = <div role="note" className="flex-none border-b border-amber-200 bg-amber-50 px-3 pb-1 pt-[calc(4px+env(safe-area-inset-top))] text-center text-xs font-semibold text-amber-800">UJI INTERNAL · data panitia hanya terlihat oleh Panitia</div>
   if (sesi === undefined) return <Layar pita={pita}><p className="text-center text-muted">Memuat…</p></Layar>
   if (!sesi) return <Layar pita={pita}><Masuk google={google} /></Layar>
 
   const staf = data && data.peran.some(p => p.peran === 'panitia' || p.peran === 'superadmin')
   const scan = data && bolehScan(data)
   const menu = [['beranda', 'Beranda', IK.rumah], ['hadir', 'Kehadiran', IK.hadir]].concat(scan ? [['kiosk', 'Kiosk', IK.kiosk]] : []).concat(staf ? [['panitia', 'Pendaftar', IK.daftar]] : []).concat([['akun', 'Akun', IK.akun]])
-  const judul = { beranda: 'Beranda', daftar: 'Daftarkan Anak', hadir: 'Kehadiran', kiosk: 'Kiosk Kedatangan', panitia: 'Semua Pendaftar', akun: 'Akun' }[hal]
+  const judul = { beranda: 'Beranda', daftar: 'Daftarkan Anak', hadir: 'Kehadiran', kiosk: 'Kiosk Kedatangan', panitia: 'SPMB', akun: 'Akun' }[hal]
   return <div className="mx-auto flex h-dvh max-w-3xl flex-col">
     {pita}
     <header className="flex min-h-13 flex-none items-center gap-2 border-b border-line bg-white px-3">
@@ -61,7 +62,7 @@ export default function App() {
       {data && hal === 'daftar' && <Formulir data={data} daring={daring} selesai={() => { muat(); setHal('beranda') }} />}
       {data && hal === 'hadir' && <Kehadiran data={data} saya={sesi.user.id} muat={muat} />}
       {data && hal === 'kiosk' && scan && <Kiosk daring={daring} muat={muat} />}
-      {data && hal === 'panitia' && staf && <Panitia data={data} saya={sesi.user.id} muat={muat} />}
+      {data && hal === 'panitia' && staf && <Spmb data={data} saya={sesi.user.id} muat={muat} daring={daring} />}
       {data && hal === 'akun' && <Akun data={data} sesi={sesi} />}
     </main>
     <nav aria-label="Navigasi utama" className="flex flex-none border-t border-line bg-white/95 px-1 pb-[calc(4px+env(safe-area-inset-bottom))] pt-1 backdrop-blur">
@@ -167,6 +168,14 @@ function Formulir({ data, daring, selesai }) {
   </form>
 }
 
+function Spmb(p) {
+  const [tab, setTab] = useState('sheet')
+  return <div className="flex flex-col gap-3">
+    <div role="tablist" aria-label="Sumber data" className="grid grid-cols-2 gap-1 rounded-2xl bg-zinc-100 p-1">{[['sheet', 'Data panitia'], ['online', 'Pendaftar online']].map(t => <button key={t[0]} role="tab" aria-selected={tab === t[0]} onClick={() => setTab(t[0])} className={'min-h-11 rounded-xl text-sm font-semibold ' + (tab === t[0] ? 'bg-white shadow-sm' : 'text-muted')}>{t[1]}</button>)}</div>
+    {tab === 'sheet' ? <DataPanitia daring={p.daring} /> : <Panitia {...p} />}
+  </div>
+}
+
 function Panitia({ data, saya, muat }) {
   const [sibuk, setSibuk] = useState(''), [pesan, setPesan] = useState(''), [tanya, setTanya] = useState(null)
   const bagian = data.peran.some(p => p.peran === 'superadmin') ? null : (data.peran.find(p => p.peran === 'panitia') || { bagian: [] }).bagian
@@ -194,5 +203,5 @@ function Akun({ data, sesi }) {
     <div className="mt-2 text-sm">Kode akun: <b className="tracking-widest">{sesi.user.id.slice(0, 8).toUpperCase()}</b></div>
     <div className="mt-3 flex flex-wrap gap-2">{data.peran.map(p => <span key={p.peran} className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold">{PERAN[p.peran]}{p.bagian?.length ? ' · ' + p.bagian.join(', ') : ''}</span>)}</div></Kartu>
     <Tombol bahaya onClick={() => supabase.auth.signOut()}>Keluar</Tombol>
-    <p className="text-[13px] text-muted">Sudah di server: login, pendaftaran, dan absensi kedatangan dengan QR. Pembayaran, berkas, penjemputan, dan pengenalan wajah masih di versi demo.</p></div>
+    <p className="text-[13px] text-muted">Sudah di server: login, pendaftaran, absensi kedatangan dengan QR, dan salinan data SPMB dari sheet panitia. Pembayaran, berkas, penjemputan, dan pengenalan wajah masih di versi demo.</p></div>
 }
