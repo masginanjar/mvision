@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { supabase, caraMasuk } from './supabase.js'
+import { supabase, caraMasuk, GALAT_LINK } from './supabase.js'
 import { STATUS, PERAN, kosong, periksa, tgl } from './domain.js'
 import { Kehadiran, Kiosk, bolehScan, hariIni } from './Hadir.jsx'
 import { Lembar } from './ui.jsx'
@@ -74,9 +74,9 @@ export default function App() {
 const Layar = ({ pita, children }) => <div className="flex min-h-dvh flex-col">{pita}<div className="flex flex-1 items-center justify-center p-4"><div className="w-full max-w-sm">{children}</div></div></div>
 
 function Masuk({ google: cara }) {
-  const [sibuk, setSibuk] = useState(''), [pesan, setPesan] = useState(''), [email, setEmail] = useState(''), [terkirim, setTerkirim] = useState('')
+  const [sibuk, setSibuk] = useState(''), [pesan, setPesan] = useState(GALAT_LINK ? 'Link masuk itu sudah terpakai atau kedaluwarsa. Minta link baru, lalu tekan link di email terbaru saja, satu kali.' : ''), [email, setEmail] = useState(''), [terkirim, setTerkirim] = useState('')
   const balik = location.origin + import.meta.env.BASE_URL
-  const galat = e => /rate|limit|seconds/i.test(e.message || '') ? 'Terlalu sering mencoba. Tunggu sebentar lalu coba lagi.' : /not authorized|not allowed/i.test(e.message || '') ? 'Email ini belum diizinkan menerima link dari server uji.' : 'Belum berhasil. Coba lagi.'
+  const galat = e => /rate|limit|seconds/i.test(e.message || '') ? 'Batas kirim email tercapai. Tunggu sekitar 1 jam, lalu minta link sekali saja.' : /not authorized|not allowed/i.test(e.message || '') ? 'Email ini belum diizinkan menerima link dari server uji.' : 'Belum berhasil. Coba lagi.'
   async function google() {
     setSibuk('g'); setPesan('')
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: balik } })
