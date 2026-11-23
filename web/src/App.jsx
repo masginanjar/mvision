@@ -3,7 +3,7 @@ import { supabase, caraMasuk } from './supabase.js'
 import { STATUS, PERAN, kosong, periksa, tgl } from './domain.js'
 import { Kehadiran, Kiosk, bolehScan, hariIni } from './Hadir.jsx'
 import { Lembar } from './ui.jsx'
-import { DataPanitia } from './Spmb.jsx'
+import { DataPanitia, Jadwal } from './Spmb.jsx'
 
 const warna = { ok: 'bg-brand-soft text-brand-dark', warn: 'bg-amber-100 text-amber-800', bad: 'bg-red-100 text-red-700', info: 'bg-sky-100 text-sky-800', mute: 'bg-zinc-100 text-zinc-600' }
 const Pil = ({ s }) => { const v = STATUS[s] || [s, 'mute']; return <span className={'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ' + warna[v[1]]}>{v[0]}</span> }
@@ -171,8 +171,8 @@ function Formulir({ data, daring, selesai }) {
 function Spmb(p) {
   const [tab, setTab] = useState('sheet')
   return <div className="flex flex-col gap-3">
-    <div role="tablist" aria-label="Sumber data" className="grid grid-cols-2 gap-1 rounded-2xl bg-zinc-100 p-1">{[['sheet', 'Data panitia'], ['online', 'Pendaftar online']].map(t => <button key={t[0]} role="tab" aria-selected={tab === t[0]} onClick={() => setTab(t[0])} className={'min-h-11 rounded-xl text-sm font-semibold ' + (tab === t[0] ? 'bg-white shadow-sm' : 'text-muted')}>{t[1]}</button>)}</div>
-    {tab === 'sheet' ? <DataPanitia daring={p.daring} /> : <Panitia {...p} />}
+    <div role="tablist" aria-label="Sumber data" className="grid grid-cols-3 gap-1 rounded-2xl bg-zinc-100 p-1">{[['sheet', 'Data panitia'], ['jadwal', 'Jadwal'], ['online', 'Online']].map(t => <button key={t[0]} role="tab" aria-selected={tab === t[0]} onClick={() => setTab(t[0])} className={'min-h-11 rounded-xl text-sm font-semibold ' + (tab === t[0] ? 'bg-white shadow-sm' : 'text-muted')}>{t[1]}</button>)}</div>
+    {tab === 'sheet' ? <DataPanitia daring={p.daring} /> : tab === 'jadwal' ? <Jadwal /> : <Panitia {...p} />}
   </div>
 }
 

@@ -14,3 +14,5 @@ Kolom dipetakan menurut posisi di tab `Rekap_PPDB_2728` (baris judul 5-7, data m
 Jika panitia menyisipkan atau memindah kolom, pemetaan di view harus disesuaikan.
 
 Sumber Edge Function `tarik-spmb` sengaja tidak disimpan di repo ini karena memuat ID sheet panitia; repo ini publik.
+
+Tambahan (migrasi `spmb_sheet_jadwal_bayar`): `privat.rp`, kolom pembayaran di `spmb_pendaftar_sheet`, view `spmb_jadwal_sheet`.
